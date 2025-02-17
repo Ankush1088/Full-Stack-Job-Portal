@@ -1,5 +1,5 @@
-import jobmodel from "../Models/job.model.js";
-
+import { Job } from "../models/job.model.js";
+//Admin job posting
 export const postJob = async (req, res) => {
   try {
     const {
@@ -8,78 +8,110 @@ export const postJob = async (req, res) => {
       requirements,
       salary,
       location,
-      jobtype,
-      experienceLevel,
-      numberOfPosition,
-      company,
-      createdBy,
-      applicants,
+      jobType,
+      experience,
+      position,
+      companyId,
     } = req.body;
+    const userId = req.id;
+
     if (
       !title ||
       !description ||
       !requirements ||
       !salary ||
       !location ||
-      !jobtype ||
-      !experienceLevel ||
+      !jobType ||
+      !experience ||
       !position ||
-      !company
+      !companyId
     ) {
       return res.status(400).json({
-        message: "Missing required field",
+        message: "All fields are required",
         success: false,
       });
-
-      const job = await createImageBitmap({
-        title,
-        description,
-        requirements: requirements.split(","),
-        salary: Number(salary),
-        location,
-        jobtype,
-        experienceLevel: experience,
-        position,
-        company: companyId,
-      });
-
-      return res.status(201).json({
-        message: "job post sucess fully",
-        job,
-        success: true,
-      });
     }
+    const job = await Job.create({
+      title,
+      description,
+      requirements: requirements.split(","),
+      salary: Number(salary),
+      location,
+      jobType,
+      experienceLevel: experience,
+      position,
+      company: companyId,
+      created_by: userId,
+    });
+    res.status(201).json({
+      message: "Job posted successfully.",
+      job,
+      status: true,
+    });
   } catch (error) {
     console.error(error);
-    return res.status(500).json({
-      message: "server error",
-      success: "false",
-    });
+    return res.status(500).json({ message: "Server Error", status: false });
   }
 };
 
-export const getAllJob = async (req, res) => {
+//Users
+export const getAllJobs = async (req, res) => {
   try {
     const keyword = req.query.keyword || "";
     const query = {
       $or: [
-        { title: { $reger: keyword, $options: "i" } },
-        { description: { $reger: keyword, $options: "i" } },
+        { title: { $regex: keyword, $options: "i" } },
+        { description: { $regex: keyword, $options: "i" } },
       ],
     };
-    const jobs = await job.find(query);
-    if (!jobs) { 
-      return res.status(404).josn({
-        message: "job not found",
-        success: false,
-      });
+    const jobs = await Job.find(query)
+      .populate({
+        path: "company",
+      })
+      .sort({ createdAt: -1 });
+
+    if (!jobs) {
+      return res.status(404).json({ message: "No jobs found", status: false });
     }
- 
-    return res.status(201).json({
-      message: "job post sucess fully",
-      jobs,
-      success: true, 
+    return res.status(200).json({ jobs, status: true });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ message: "Server Error", status: false });
+  }
+};
+
+//Users
+export const getJobById = async (req, res) => {
+  try {
+    const jobId = req.params.id;
+    const job = await Job.findById(jobId).populate({
+      path: "applications",
     });
-    
-  } catch {}
+    if (!job) {
+      return res.status(404).json({ message: "Job not found", status: false });
+    }
+    return res.status(200).json({ job, status: true });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ message: "Server Error", status: false });
+  }
+};
+
+//Admin job created
+
+export const getAdminJobs = async (req, res) => {
+  try {
+    const adminId = req.id;
+    const jobs = await Job.find({ created_by: adminId }).populate({
+      path: "company",
+      sort: { createdAt: -1 },
+    });
+    if (!jobs) {
+      return res.status(404).json({ message: "No jobs found", status: false });
+    }
+    return res.status(200).json({ jobs, status: true });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ message: "Server Error", status: false });
+  }
 };
